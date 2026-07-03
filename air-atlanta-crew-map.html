@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Air Atlanta LGG — Crew Map</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#eef1f5;
+    --panel:#ffffff;
+    --panel-2:#f4f6f9;
+    --line:#dde3ea;
+    --navy:#16294a;
+    --navy-2:#24406e;
+    --red:#cf3339;
+    --text:#1b2536;
+    --muted:#67748a;
+    --green:#1e9e6a;
+    --teal:#0e7e8a;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{
+    font-family:'Inter',system-ui,sans-serif;
+    background:var(--bg);color:var(--text);
+    display:flex;flex-direction:column;overflow:hidden;
+  }
+
+  /* ── Header ── */
+  header{
+    flex:0 0 auto;background:var(--navy);color:#fff;
+    padding:10px 14px 9px;
+    display:flex;align-items:baseline;gap:10px;z-index:1200;
+    border-bottom:3px solid var(--red);
+  }
+  header .code{
+    font-family:'JetBrains Mono',monospace;font-weight:700;
+    color:#fff;background:var(--red);border-radius:5px;
+    font-size:13px;letter-spacing:.08em;padding:2px 7px;
+    align-self:center;
+  }
+  header h1{
+    font-family:'Barlow Condensed',sans-serif;font-weight:600;
+    font-size:20px;letter-spacing:.13em;text-transform:uppercase;
+  }
+  header .status{
+    margin-left:auto;font-family:'JetBrains Mono',monospace;
+    font-size:10px;color:#aebadc;letter-spacing:.06em;
+    display:flex;align-items:center;gap:6px;white-space:nowrap;
+  }
+  header .dot{width:7px;height:7px;border-radius:50%;background:#f0b429;animation:blink 1.6s infinite}
+  header .dot.ok{background:#4ecf95;animation:none}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+
+  /* ── Map ── */
+  #map{flex:1;background:var(--bg)}
+  .leaflet-container{font-family:'Inter',sans-serif}
+
+  .pin-badge{
+    font-family:'JetBrains Mono',monospace;font-weight:700;font-size:11px;
+    letter-spacing:.05em;color:#fff;background:var(--navy);
+    border:2px solid #fff;border-radius:6px;
+    padding:3px 6px;white-space:nowrap;
+    box-shadow:0 2px 8px rgba(22,41,74,.4);
+    display:inline-block;transform:translate(-50%,-120%);
+    position:relative;
+  }
+  .pin-badge::after{
+    content:'';position:absolute;left:50%;bottom:-7px;transform:translateX(-50%);
+    border:5px solid transparent;border-top-color:var(--navy);
+  }
+  .pin-badge.grpB{background:var(--teal)}
+  .pin-badge.grpB::after{border-top-color:var(--teal)}
+  .pin-badge.sel{background:var(--red)}
+  .pin-badge.sel::after{border-top-color:var(--red)}
+
+  .group-head{
+    display:flex;align-items:center;gap:8px;
+    font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;
+    letter-spacing:.14em;text-transform:uppercase;color:var(--muted);
+    padding:10px 4px 7px;
+  }
+  .group-head .gdot{width:10px;height:10px;border-radius:3px;background:var(--navy)}
+  .group-head.b .gdot{background:var(--teal)}
+  .group-head .gcount{
+    font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;
+    background:var(--panel-2);border:1px solid var(--line);border-radius:4px;
+    padding:1px 6px;color:var(--text);
+  }
+  .crew.grpB .badge{color:var(--teal);border-color:var(--teal)}
+
+  .route-num{
+    font-family:'JetBrains Mono',monospace;font-weight:700;font-size:11px;
+    color:#fff;background:var(--red);border:2px solid #fff;border-radius:50%;
+    width:22px;height:22px;line-height:18px;text-align:center;
+    box-shadow:0 1px 5px rgba(0,0,0,.35);
+    transform:translate(-50%,-50%);display:inline-block;
+  }
+  .dest-flag{
+    font-family:'JetBrains Mono',monospace;font-weight:700;font-size:11px;
+    color:#fff;background:var(--green);border:2px solid #fff;border-radius:6px;
+    padding:3px 7px;transform:translate(-50%,-50%);display:inline-block;
+    box-shadow:0 1px 6px rgba(0,0,0,.35);white-space:nowrap;
+  }
+
+  /* ── Bottom sheet ── */
+  #sheetPanel{
+    flex:0 0 auto;background:var(--panel);
+    border-top:1px solid var(--line);
+    border-radius:16px 16px 0 0;
+    margin-top:-14px;z-index:1100;
+    max-height:48vh;display:flex;flex-direction:column;
+    box-shadow:0 -6px 24px rgba(22,41,74,.14);
+    transition:max-height .25s ease;
+  }
+  #sheetPanel.collapsed{max-height:52px}
+  #sheetHandle{
+    flex:0 0 auto;padding:8px 14px 6px;cursor:pointer;
+    display:flex;align-items:center;gap:8px;user-select:none;
+  }
+  #sheetHandle .grip{width:36px;height:4px;border-radius:2px;background:var(--line);margin:0 auto 0 0}
+  #sheetHandle .label{
+    font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;
+    letter-spacing:.12em;text-transform:uppercase;color:var(--muted);white-space:nowrap;
+  }
+  #sheetHandle .count{
+    font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;
+    color:var(--navy);background:var(--panel-2);border:1px solid var(--line);
+    border-radius:5px;padding:2px 7px;
+  }
+  #search{
+    margin:0 14px 8px;flex:0 0 auto;
+    background:var(--panel-2);border:1px solid var(--line);border-radius:9px;
+    color:var(--text);font:500 14px 'Inter',sans-serif;
+    padding:9px 12px;width:calc(100% - 28px);outline:none;
+  }
+  #search::placeholder{color:var(--muted)}
+  #search:focus{border-color:var(--navy-2)}
+
+  /* Route bar */
+  #routeBar{
+    flex:0 0 auto;margin:0 14px 10px;padding:9px 10px;
+    background:var(--navy);border-radius:11px;color:#fff;
+    display:none;flex-direction:column;gap:8px;
+  }
+  #routeBar.on{display:flex}
+  #routeBar .rb-top{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600}
+  #routeBar select{
+    flex:1;background:var(--navy-2);color:#fff;border:1px solid #3a5688;
+    border-radius:7px;font:600 12.5px 'Inter',sans-serif;padding:7px 8px;outline:none;
+  }
+  #routeBar .rb-btns{display:flex;gap:7px}
+  #routeBar button, #routeBar a.gm{
+    flex:1;border:none;border-radius:8px;padding:9px 6px;cursor:pointer;
+    font:700 12.5px 'Inter',sans-serif;text-align:center;text-decoration:none;
+  }
+  #genRoute{background:var(--red);color:#fff}
+  #clearRoute{background:transparent;color:#c6d2ea;border:1px solid #3a5688!important}
+  a.gm{background:#fff;color:var(--navy);display:none}
+  a.gm.on{display:block}
+  #routeInfo{font:600 11px 'JetBrains Mono',monospace;color:#9fb4dd;display:none}
+  #routeInfo.on{display:block}
+
+  #roster{overflow-y:auto;padding:0 10px 14px;flex:1}
+
+  .crew{
+    background:var(--panel-2);border:1px solid var(--line);border-radius:12px;
+    padding:11px 12px;margin-bottom:8px;
+  }
+  .crew.active{border-color:var(--navy-2)}
+  .crew.selected{border-color:var(--red);background:#fdf2f2}
+  .crew-top{display:flex;align-items:center;gap:10px}
+  .crew .pick{
+    flex:0 0 auto;width:24px;height:24px;border-radius:7px;
+    border:2px solid var(--line);background:#fff;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    font-size:14px;color:#fff;font-weight:700;
+  }
+  .crew.selected .pick{background:var(--red);border-color:var(--red)}
+  .crew .badge{
+    font-family:'JetBrains Mono',monospace;font-weight:700;font-size:12px;
+    color:var(--navy);background:#fff;
+    border:1px solid var(--navy-2);border-radius:6px;
+    padding:4px 7px;letter-spacing:.05em;min-width:52px;text-align:center;
+  }
+  .crew .who{min-width:0;flex:1;cursor:pointer}
+  .crew .name{font-weight:600;font-size:14.5px;display:flex;align-items:center;gap:6px}
+  .crew .garage{
+    font-size:10px;font-weight:700;letter-spacing:.04em;
+    color:var(--green);background:#e5f5ee;border:1px solid #bfe6d4;
+    border-radius:5px;padding:1px 5px;
+  }
+  .crew .temp-badge{
+    font-size:10px;font-weight:700;letter-spacing:.04em;
+    color:#9a6b12;background:#fdf3dd;border:1px solid #eed9a8;
+    border-radius:5px;padding:1px 5px;
+  }
+  .crew .temp-note{color:var(--muted);font-weight:400;font-size:11px}
+  .crew .addr{font-size:12px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .crew .geo-fail{color:var(--red)}
+  .crew-actions{display:flex;gap:7px;margin-top:10px}
+  .crew-actions a{
+    flex:1;text-align:center;text-decoration:none;
+    font:600 12.5px 'Inter',sans-serif;color:var(--text);
+    background:#fff;border:1px solid var(--line);border-radius:8px;
+    padding:9px 4px;
+  }
+  .crew-actions a:active{border-color:var(--navy-2)}
+  .crew-actions a.nav{color:var(--navy);font-weight:700}
+  .crew-actions a.disabled{opacity:.35;pointer-events:none}
+
+  #notice{padding:20px 18px;text-align:center;color:var(--muted);font-size:13px;line-height:1.55}
+  #notice code{
+    font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--red);
+    background:var(--panel-2);padding:2px 5px;border-radius:4px;
+  }
+
+  /* Leaflet popup */
+  .leaflet-popup-content-wrapper{
+    background:var(--panel);color:var(--text);border-radius:10px;
+    border:1px solid var(--line);box-shadow:0 6px 20px rgba(22,41,74,.18);
+  }
+  .leaflet-popup-tip{background:var(--panel)}
+  .leaflet-popup-content{margin:10px 14px;font:500 13px 'Inter',sans-serif}
+  .pp-code{font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--red);font-size:11px;letter-spacing:.06em}
+  .pp-name{font-weight:700;font-size:15px;margin:2px 0 1px;color:var(--navy)}
+  .pp-addr{color:var(--muted);font-size:12px;margin-bottom:8px}
+  .pp-row{display:flex;gap:6px}
+  .pp-row a{
+    text-decoration:none;color:var(--text);font-weight:600;font-size:12px;
+    background:var(--panel-2);border:1px solid var(--line);border-radius:7px;
+    padding:7px 10px;flex:1;text-align:center;white-space:nowrap;
+  }
+  .pp-row a.nav{color:var(--navy);font-weight:700}
+  .leaflet-control-attribution{font-size:9px!important}
+</style>
+</head>
+<body>
+
+<header>
+  <span class="code">LGG</span>
+  <h1>Air Atlanta · Crew Map</h1>
+  <span class="status"><span class="dot" id="statusDot"></span><span id="statusText">LOADING</span></span>
+</header>
+
+<div id="map"></div>
+
+<div id="sheetPanel">
+  <div id="sheetHandle" onclick="toggleSheet()">
+    <span class="label">Crew Roster</span>
+    <span class="count" id="count">—</span>
+    <div class="grip"></div>
+  </div>
+  <input id="search" type="text" placeholder="Search code, name or street…" oninput="renderRoster()">
+
+  <div id="routeBar">
+    <div class="rb-top">
+      <span id="selCount">0 selected</span>
+      <select id="destSel">
+        <option value="LGG">→ Liège Airport (LGG)</option>
+        <option value="MST">→ Maastricht Aachen (MST)</option>
+        <option value="CTR">→ Maastricht centre</option>
+      </select>
+    </div>
+    <div class="rb-btns">
+      <button id="genRoute" onclick="generateRoute()">Smartest route</button>
+      <a class="gm" id="gmLink" href="#" target="_blank" rel="noopener">Open in Google Maps</a>
+      <button id="clearRoute" onclick="clearSelection()">Clear</button>
+    </div>
+    <span id="routeInfo"></span>
+  </div>
+
+  <div id="roster"><div id="notice">Loading roster…</div></div>
+</div>
+
+<script>
+/* ════════════════════════════════════════════════════════════════
+   SETUP — the only line you need to touch.
+
+   1. In your Google Sheet: File → Share → Publish to web
+      → choose the sheet tab → format: CSV → Publish → copy link.
+   2. Paste it between the quotes below.
+
+   Sheet columns (row 1 = headers, exactly these):
+   Code | Name | Address | Phone | Messenger | Garage | Temp apartment
+
+   Code      = 3/4 letter code (GOHE, IVMK…)
+   Address   = permanent street + number; "Maastricht, Netherlands"
+               is added automatically if the city is missing
+   Messenger = facebook username OR full facebook.com / m.me link
+   Garage    = yes / no (also accepts y, ja, já, 1, true)
+   Temp apartment = OVERRIDES Address while filled in. Type a hotel
+               name from the list below (partial match works, e.g.
+               just "crowne") or any other address. Clear the cell
+               to go back to the permanent address.
+
+   RECOMMENDED: give the Temp apartment column a dropdown in Google
+   Sheets → select the column → Data → Data validation → Dropdown →
+   add the hotel names below (plus a blank option). The map matches
+   them to real addresses automatically.
+   ════════════════════════════════════════════════════════════════ */
+const SHEET_CSV_URL = "";   // ← paste your published-sheet CSV link here
+
+/* Major hotels / crew hotels around Maastricht — the Temp apartment
+   column matches against these names (case-insensitive, partial).
+   Add your own lines freely: 'Name': 'Street, City' */
+const HOTELS = {
+  'Amrath Grand Hotel de l\'Empereur': 'Stationsstraat 2, Maastricht, Netherlands',
+  'Amrath Hotel DuCasque': 'Helmstraat 14, Maastricht, Netherlands',
+  'Crowne Plaza Maastricht': 'De Ruiterij 1, Maastricht, Netherlands',
+  'NH Maastricht': 'Forum 110, Maastricht, Netherlands',
+  'Novotel Maastricht': 'Sibemaweg 10, Maastricht, Netherlands',
+  'Van der Valk Hotel Maastricht': 'Nijverheidsweg 35, Maastricht, Netherlands',
+  'Kruisherenhotel': 'Kruisherengang 19, Maastricht, Netherlands',
+  'Hotel Beaumont': 'Wycker Brugstraat 2, Maastricht, Netherlands',
+  'The Social Hub Maastricht': 'Sphinxcour 9, Maastricht, Netherlands',
+  'Apart Hotel Randwyck': 'Endepolsdomein 30, Maastricht, Netherlands'
+};
+
+/* Resolve a Temp apartment cell: hotel name → its address, otherwise
+   treat the text itself as an address. */
+function resolveTemp(t){
+  t = (t||'').trim();
+  if(!t) return null;
+  const q = t.toLowerCase();
+  for(const name in HOTELS){
+    if(name.toLowerCase().includes(q) || q.includes(name.toLowerCase()))
+      return {label:name, address:HOTELS[name]};
+  }
+  return {label:t, address:t};
+}
+/* The address the map should actually use for this person */
+function effAddr(c){
+  const t = resolveTemp(c.Temp);
+  return fullAddress(t ? t.address : c.Address);
+}
+
+/* Destinations for the route planner */
+const DESTS = {
+  LGG:{name:'Liège Airport', code:'LGG', lat:50.6374, lng:5.4432, q:'Liège Airport, Belgium'},
+  MST:{name:'Maastricht Aachen Airport', code:'MST', lat:50.9117, lng:5.7700, q:'Maastricht Aachen Airport'},
+  CTR:{name:'Maastricht centre', code:'MST-C', lat:50.8489, lng:5.6889, q:'Vrijthof, Maastricht'}
+};
+
+/* Demo crew shown until a sheet link is added */
+const DEMO = [
+  {Code:"GOHE", Name:"Gunnar H.", Address:"Batterijstraat 30, Maastricht",   Phone:"+354 555 1234",   Messenger:"gunnar.example",  Garage:"yes", Temp:""},
+  {Code:"IVMK", Name:"Ivan M.",   Address:"Avenue Céramique 100, Maastricht",Phone:"+31 6 1234 5678", Messenger:"ivan.example",    Garage:"no",  Temp:""},
+  {Code:"THOR", Name:"Þorgeir",   Address:"Bellefroidlunet 15, Maastricht",  Phone:"+354 555 9876",   Messenger:"thorgeir.example",Garage:"no",  Temp:""},
+  {Code:"MICU", Name:"Mihai C.",  Address:"Stationsstraat 22, Maastricht",   Phone:"+40 700 000 000", Messenger:"",                Garage:"yes", Temp:""},
+  {Code:"HISI", Name:"Hilmar S.", Address:"Brusselseweg 300, Maastricht",    Phone:"+354 555 4321",   Messenger:"",                Garage:"no",  Temp:"crowne"},
+];
+
+/* ── map ── */
+const map = L.map('map',{zoomControl:true}).setView([50.848,5.700],13);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{
+  attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:19
+}).addTo(map);
+
+/* subtle A/B divider drawn along the river */
+let maasLine = null;
+
+let crew = [];             // {Code,Name,Address,Phone,Messenger,Garage,lat,lng,marker,geoFailed,selected,group}
+const geoCache = {};
+let routeLayer = null;
+
+/* ── helpers ── */
+const $ = id => document.getElementById(id);
+function setStatus(txt, ok){ $('statusText').textContent = txt; $('statusDot').className = 'dot' + (ok?' ok':''); }
+function esc(s){ return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function hasGarage(v){ return /^(y|yes|ja|já|j|1|true|x)$/i.test((v||'').trim()); }
+function navLink(addr){ return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(addr); }
+function telLink(p){ return p ? 'tel:' + p.replace(/[^\d+]/g,'') : ''; }
+function msgLink(m){
+  if(!m) return '';
+  m = m.trim();
+  if(/^https?:\/\//i.test(m)) return m.replace(/^https?:\/\/(www\.)?facebook\.com\//i,'https://m.me/');
+  return 'https://m.me/' + m.replace(/^@/,'');
+}
+/* ── Maas river centerline through Maastricht (south → north) ──
+   Used to auto-sort crew: west of the river = Group A, east = Group B. */
+const MAAS = [
+  [50.800, 5.695],
+  [50.820, 5.6975],
+  [50.835, 5.699],
+  [50.8484, 5.6975],   // Sint Servaasbrug
+  [50.858, 5.698],
+  [50.868, 5.702],
+  [50.882, 5.707],
+  [50.910, 5.716]
+];
+function sideOfMaas(lat, lng){
+  /* interpolate the river's longitude at this latitude */
+  let riverLng;
+  if(lat <= MAAS[0][0]) riverLng = MAAS[0][1];
+  else if(lat >= MAAS[MAAS.length-1][0]) riverLng = MAAS[MAAS.length-1][1];
+  else{
+    for(let i=0;i<MAAS.length-1;i++){
+      const [la1,lo1] = MAAS[i], [la2,lo2] = MAAS[i+1];
+      if(lat >= la1 && lat <= la2){
+        const t = (lat - la1) / (la2 - la1);
+        riverLng = lo1 + t * (lo2 - lo1);
+        break;
+      }
+    }
+  }
+  return lng < riverLng ? 'A' : 'B';
+}
+
+maasLine = L.polyline(MAAS, {color:'#4d7ab8', weight:2, opacity:.5, dashArray:'2 7'})
+  .addTo(map)
+  .bindTooltip('A | B — Maas divider', {sticky:true, direction:'top'});
+
+function fullAddress(a){
+  a = (a||'').trim();
+  if(!a) return '';
+  return /maastricht|netherlands|nederland|belgi|liege|liège/i.test(a) ? a : a + ', Maastricht, Netherlands';
+}
+
+/* ── load sheet ── */
+async function loadSheet(){
+  if(!SHEET_CSV_URL){
+    setStatus('DEMO DATA', false);
+    crew = DEMO.map(r => ({...r}));
+    $('roster').insertAdjacentHTML('afterbegin',
+      '<div id="notice">Showing demo crew — paste your published Google Sheet link into <code>SHEET_CSV_URL</code> in this file to go live.</div>');
+    await geocodeAll();
+    return;
+  }
+  try{
+    const res = await fetch(SHEET_CSV_URL, {cache:'no-store'});
+    const text = await res.text();
+    const parsed = Papa.parse(text, {header:true, skipEmptyLines:true});
+    crew = parsed.data
+      .map(r => {
+        const g = {};
+        for(const k in r){ g[k.trim().toLowerCase()] = (r[k]||'').trim(); }
+        return {
+          Code: g['code'] || g['3/4 letter code'] || '',
+          Name: g['name'] || '',
+          Address: g['address'] || '',
+          Phone: g['phone'] || g['phone number'] || '',
+          Messenger: g['messenger'] || g['facebook messenger'] || '',
+          Garage: g['garage'] || '',
+          Temp: g['temp apartment'] || g['temp'] || g['temporary'] || ''
+        };
+      })
+      .filter(r => r.Name || r.Code);
+    setStatus('LIVE · ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}), true);
+    await geocodeAll();
+  }catch(e){
+    setStatus('SHEET ERROR', false);
+    $('roster').innerHTML = '<div id="notice">Couldn\'t load the sheet. Check that it\'s published to web as CSV and the link in <code>SHEET_CSV_URL</code> is correct.</div>';
+  }
+}
+
+/* ── geocoding (Nominatim, polite spacing) ── */
+async function geocode(addr){
+  if(geoCache[addr]) return geoCache[addr];
+  const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(addr);
+  const res = await fetch(url, {headers:{'Accept':'application/json'}});
+  const js = await res.json();
+  if(js && js[0]){
+    const pt = [parseFloat(js[0].lat), parseFloat(js[0].lon)];
+    geoCache[addr] = pt;
+    return pt;
+  }
+  return null;
+}
+
+async function geocodeAll(){
+  renderRoster(); updateCount();
+  for(let i=0;i<crew.length;i++){
+    const c = crew[i];
+    const addr = effAddr(c);
+    if(!addr){ c.geoFailed = true; continue; }
+    try{
+      const pt = await geocode(addr);
+      if(pt){ c.lat = pt[0]; c.lng = pt[1]; c.group = sideOfMaas(c.lat, c.lng); addMarker(c); }
+      else c.geoFailed = true;
+    }catch(e){ c.geoFailed = true; }
+    renderRoster(); updateCount();
+    if(i < crew.length-1) await new Promise(r => setTimeout(r, 1100));
+  }
+  fitAll();
+}
+
+function markerHtml(c){
+  const t = resolveTemp(c.Temp);
+  return '<div class="pin-badge'+(c.group==='B'?' grpB':'')+(c.selected?' sel':'')+'">'+esc(c.Code||'?')+(t?' 🏨':'')+(hasGarage(c.Garage)?' 🚗':'')+'</div>';
+}
+function addMarker(c){
+  const icon = L.divIcon({className:'', html:markerHtml(c), iconSize:[0,0]});
+  c.marker = L.marker([c.lat,c.lng], {icon}).addTo(map);
+  c.marker.bindPopup(popupHtml(c));
+  c.marker.on('click', () => highlight(c, false));
+}
+function refreshMarker(c){
+  if(c.marker) c.marker.setIcon(L.divIcon({className:'', html:markerHtml(c), iconSize:[0,0]}));
+}
+
+function popupHtml(c){
+  const t = resolveTemp(c.Temp);
+  const addr = effAddr(c);
+  let btns = '<a class="nav" href="'+navLink(addr)+'" target="_blank" rel="noopener">📍 Navigate</a>';
+  if(c.Phone) btns += '<a href="'+telLink(c.Phone)+'">📞 Call</a>';
+  if(c.Messenger) btns += '<a href="'+msgLink(c.Messenger)+'" target="_blank" rel="noopener">💬 Chat</a>';
+  const grp = c.group ? ' · GROUP ' + c.group + (c.group==='A' ? ' (WEST)' : ' (EAST)') : '';
+  const addrLine = t
+    ? '🏨 ' + esc(t.label) + ' <span style="opacity:.65">(temp)</span>'
+    : esc(c.Address);
+  return '<div class="pp-code">'+esc(c.Code)+grp+(t?' · TEMP':'')+(hasGarage(c.Garage)?' · 🚗 GARAGE':'')+'</div>'
+       + '<div class="pp-name">'+esc(c.Name)+'</div>'
+       + '<div class="pp-addr">'+addrLine+'</div>'
+       + '<div class="pp-row">'+btns+'</div>';
+}
+
+function fitAll(){
+  const pts = crew.filter(c=>c.marker).map(c=>[c.lat,c.lng]);
+  if(pts.length) map.fitBounds(pts, {padding:[46,46], maxZoom:15});
+}
+
+/* ── roster ── */
+function updateCount(){
+  const a = crew.filter(c=>c.group==='A').length, b = crew.filter(c=>c.group==='B').length;
+  $('count').textContent = crew.length + ' CREW' + ((a||b) ? ' · '+a+'W / '+b+'E' : '');
+}
+
+function renderRoster(){
+  const q = $('search').value.trim().toLowerCase();
+  const list = crew.filter(c =>
+    !q || [c.Code,c.Name,c.Address,c.Temp].join(' ').toLowerCase().includes(q));
+  const host = $('roster');
+  const notice = $('notice');
+  host.innerHTML = '';
+  if(notice && !SHEET_CSV_URL) host.appendChild(notice);
+  if(!list.length){
+    host.insertAdjacentHTML('beforeend','<div style="padding:18px;text-align:center;color:var(--muted);font-size:13px">No match.</div>');
+    return;
+  }
+  const sections = [
+    {key:'A', label:'Group A · West of Maas', cls:''},
+    {key:'B', label:'Group B · East of Maas', cls:'b'},
+    {key:undefined, label:'Unsorted · no map position yet', cls:''}
+  ];
+  sections.forEach(sec => {
+    const members = list.filter(c => c.group === sec.key)
+      .sort((a,b) => (a.Code||'').localeCompare(b.Code||''));
+    if(!members.length) return;
+    host.insertAdjacentHTML('beforeend',
+      '<div class="group-head '+sec.cls+'"><span class="gdot"></span>'+sec.label+
+      '<span class="gcount">'+members.length+'</span></div>');
+    members.forEach(c => host.appendChild(crewCard(c)));
+  });
+}
+
+function crewCard(c){
+    const t = resolveTemp(c.Temp);
+    const addr = effAddr(c);
+    const el = document.createElement('div');
+    el.className = 'crew' + (c.selected ? ' selected' : '') + (c.group==='B' ? ' grpB' : '');
+    el.dataset.code = c.Code;
+    const addrLine = t
+      ? '🏨 ' + esc(t.label) + ' <span class="temp-note">temp · home: ' + esc(c.Address || '—') + '</span>'
+      : esc(c.Address || 'no address');
+    el.innerHTML =
+      '<div class="crew-top">'
+      + '<span class="pick">'+(c.selected?'✓':'')+'</span>'
+      + '<span class="badge">'+esc(c.Code||'—')+'</span>'
+      + '<span class="who"><div class="name">'+esc(c.Name||'')
+      + (t?'<span class="temp-badge">🏨 TEMP</span>':'')
+      + (hasGarage(c.Garage)?'<span class="garage">🚗 GARAGE</span>':'')+'</div>'
+      + '<div class="addr'+(c.geoFailed?' geo-fail':'')+'">'+(c.geoFailed?'⚠ address not found on map — ':'')+addrLine+'</div></span>'
+      + '</div>'
+      + '<div class="crew-actions">'
+      + '<a class="nav'+(addr?'':' disabled')+'" href="'+(addr?navLink(addr):'#')+'" target="_blank" rel="noopener">📍 Navigate</a>'
+      + '<a class="'+(c.Phone?'':'disabled')+'" href="'+(c.Phone?telLink(c.Phone):'#')+'">📞 Call</a>'
+      + '<a class="'+(c.Messenger?'':'disabled')+'" href="'+(c.Messenger?msgLink(c.Messenger):'#')+'" target="_blank" rel="noopener">💬 Chat</a>'
+      + '</div>';
+    el.querySelector('.pick').addEventListener('click', e => { e.stopPropagation(); toggleSelect(c); });
+    el.querySelector('.who').addEventListener('click', () => highlight(c, true));
+    return el;
+}
+
+function highlight(c, fly){
+  document.querySelectorAll('.crew').forEach(e => e.classList.toggle('active', e.dataset.code === c.Code));
+  if(c.marker){
+    if(fly) map.flyTo([c.lat,c.lng], 16, {duration:.7});
+    c.marker.openPopup();
+  }
+}
+
+/* ── selection & route planning ── */
+function toggleSelect(c){
+  c.selected = !c.selected;
+  refreshMarker(c);
+  renderRoster();
+  updateRouteBar();
+}
+function selectedCrew(){ return crew.filter(c => c.selected && c.marker); }
+
+function updateRouteBar(){
+  const n = crew.filter(c=>c.selected).length;
+  $('routeBar').classList.toggle('on', n > 0);
+  $('selCount').textContent = n + ' selected';
+  if(n === 0) clearRouteDrawing();
+}
+
+function clearSelection(){
+  crew.forEach(c => { if(c.selected){ c.selected = false; refreshMarker(c); } });
+  clearRouteDrawing();
+  renderRoster();
+  updateRouteBar();
+}
+
+function clearRouteDrawing(){
+  if(routeLayer){ map.removeLayer(routeLayer); routeLayer = null; }
+  $('gmLink').classList.remove('on');
+  $('routeInfo').classList.remove('on');
+}
+
+/* haversine km */
+function dist(a, b){
+  const R = 6371, toR = Math.PI/180;
+  const dLat = (b.lat-a.lat)*toR, dLng = (b.lng-a.lng)*toR;
+  const h = Math.sin(dLat/2)**2 + Math.cos(a.lat*toR)*Math.cos(b.lat*toR)*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.sqrt(h));
+}
+
+/* Smartest pickup order: visit every selected home once, end at the
+   destination, minimise total distance. Exact (all permutations) up to
+   7 homes; nearest-neighbour + 2-opt beyond that. */
+function bestOrder(stops, dest){
+  const n = stops.length;
+  if(n === 1) return [0];
+
+  function pathLen(order){
+    let d = 0;
+    for(let i=0;i<order.length-1;i++) d += dist(stops[order[i]], stops[order[i+1]]);
+    d += dist(stops[order[order.length-1]], dest);
+    return d;
+  }
+
+  if(n <= 7){
+    const idx = [...Array(n).keys()];
+    let best = null, bestD = Infinity;
+    const permute = (arr, cur=[]) => {
+      if(!arr.length){
+        const d = pathLen(cur);
+        if(d < bestD){ bestD = d; best = [...cur]; }
+        return;
+      }
+      for(let i=0;i<arr.length;i++)
+        permute(arr.slice(0,i).concat(arr.slice(i+1)), [...cur, arr[i]]);
+    };
+    permute(idx);
+    return best;
+  }
+
+  /* NN from best start, then 2-opt */
+  let best = null, bestD = Infinity;
+  for(let s=0;s<n;s++){
+    const left = [...Array(n).keys()].filter(i=>i!==s);
+    const order = [s];
+    while(left.length){
+      const last = stops[order[order.length-1]];
+      let bi = 0, bd = Infinity;
+      left.forEach((i,k) => { const d = dist(last, stops[i]); if(d<bd){bd=d;bi=k;} });
+      order.push(left.splice(bi,1)[0]);
+    }
+    let improved = true;
+    while(improved){
+      improved = false;
+      for(let i=0;i<order.length-1;i++)
+        for(let j=i+1;j<order.length;j++){
+          const cand = order.slice(0,i).concat(order.slice(i,j+1).reverse(), order.slice(j+1));
+          if(pathLen(cand) < pathLen(order)){ order.splice(0,order.length,...cand); improved = true; }
+        }
+    }
+    const d = pathLen(order);
+    if(d < bestD){ bestD = d; best = order; }
+  }
+  return best;
+}
+
+function generateRoute(){
+  const sel = selectedCrew();
+  if(!sel.length){ return; }
+  const dest = DESTS[$('destSel').value];
+  const order = bestOrder(sel, dest);
+  const ordered = order.map(i => sel[i]);
+
+  clearRouteDrawing();
+  routeLayer = L.layerGroup().addTo(map);
+
+  const pts = ordered.map(c => [c.lat, c.lng]);
+  pts.push([dest.lat, dest.lng]);
+
+  L.polyline(pts, {color:'#cf3339', weight:4, opacity:.85, dashArray:'8 8'}).addTo(routeLayer);
+  ordered.forEach((c,i) => {
+    L.marker([c.lat,c.lng], {icon:L.divIcon({className:'',html:'<div class="route-num">'+(i+1)+'</div>',iconSize:[0,0]}), zIndexOffset:1000}).addTo(routeLayer);
+  });
+  L.marker([dest.lat,dest.lng], {icon:L.divIcon({className:'',html:'<div class="dest-flag">'+esc(dest.code)+'</div>',iconSize:[0,0]}), zIndexOffset:1000}).addTo(routeLayer);
+
+  map.fitBounds(pts, {padding:[50,50]});
+
+  /* straight-line total, driving will be a bit more */
+  let km = 0;
+  for(let i=0;i<pts.length-1;i++) km += dist({lat:pts[i][0],lng:pts[i][1]},{lat:pts[i+1][0],lng:pts[i+1][1]});
+  const info = $('routeInfo');
+  info.textContent = 'PICKUP: ' + ordered.map(c=>c.Code).join(' → ') + ' → ' + dest.code + '  ·  ~' + km.toFixed(1) + ' km direct';
+  info.classList.add('on');
+
+  /* Google Maps directions: origin = first home, waypoints = rest, destination = airport */
+  const origin = encodeURIComponent(effAddr(ordered[0]));
+  const waypts = ordered.slice(1).map(c => encodeURIComponent(effAddr(c))).join('%7C');
+  let gm = 'https://www.google.com/maps/dir/?api=1&origin=' + origin
+         + '&destination=' + encodeURIComponent(dest.q) + '&travelmode=driving';
+  if(waypts) gm += '&waypoints=' + waypts;
+  const a = $('gmLink');
+  a.href = gm;
+  a.classList.add('on');
+}
+
+function toggleSheet(){ $('sheetPanel').classList.toggle('collapsed'); setTimeout(()=>map.invalidateSize(), 280); }
+
+loadSheet();
+</script>
+</body>
+</html>
