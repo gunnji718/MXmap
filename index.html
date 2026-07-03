@@ -56,6 +56,23 @@
   header .dot{width:7px;height:7px;border-radius:50%;background:#f0b429;animation:blink 1.6s infinite}
   header .dot.ok{background:#4ecf95;animation:none}
   @keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+  #refreshBtn{
+    background:var(--navy-2);color:#fff;border:1px solid #3a5688;
+    border-radius:7px;width:30px;height:30px;cursor:pointer;
+    font-size:16px;line-height:1;align-self:center;flex:0 0 auto;
+  }
+  #refreshBtn:active{background:#2e4d80}
+
+  /* ── Toast ── */
+  #toast{
+    position:fixed;top:56px;left:50%;transform:translateX(-50%) translateY(-8px);
+    background:var(--navy);color:#fff;font:600 13px 'Inter',sans-serif;
+    padding:10px 16px;border-radius:10px;box-shadow:0 6px 20px rgba(22,41,74,.35);
+    opacity:0;pointer-events:none;transition:opacity .2s, transform .2s;
+    z-index:3000;max-width:90vw;text-align:center;
+  }
+  #toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+  #toast.err{background:var(--red)}
 
   /* ── Map ── */
   #map{flex:1;background:var(--bg)}
@@ -114,10 +131,11 @@
     border-top:1px solid var(--line);
     border-radius:16px 16px 0 0;
     margin-top:-14px;z-index:1100;
-    max-height:48vh;display:flex;flex-direction:column;
+    max-height:52vh;display:flex;flex-direction:column;
     box-shadow:0 -6px 24px rgba(22,41,74,.14);
     transition:max-height .25s ease;
   }
+  #sheetPanel.expanded{max-height:70vh}
   #sheetPanel.collapsed{max-height:52px}
   #sheetHandle{
     flex:0 0 auto;padding:8px 14px 6px;cursor:pointer;
@@ -141,6 +159,22 @@
   }
   #search::placeholder{color:var(--muted)}
   #search:focus{border-color:var(--navy-2)}
+
+  #addMxBtn{
+    margin:6px 4px 2px;width:calc(100% - 8px);
+    background:#fff;border:1.5px dashed var(--line);border-radius:9px;
+    color:var(--muted);font:700 13px 'Inter',sans-serif;
+    padding:10px 8px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;gap:6px;
+  }
+  #addMxBtn:active{background:var(--panel-2);color:var(--navy);border-color:var(--navy-2)}
+
+  #routeChip{
+    display:none;font:700 11px 'JetBrains Mono',monospace;letter-spacing:.03em;
+    background:var(--red);color:#fff;border:none;border-radius:6px;
+    padding:5px 9px;cursor:pointer;white-space:nowrap;
+  }
+  #routeChip.on{display:inline-block}
 
   /* Route bar */
   #routeBar{
@@ -182,6 +216,13 @@
     font-size:14px;color:#fff;font-weight:700;
   }
   .crew.selected .pick{background:var(--red);border-color:var(--red)}
+  .crew .edit-btn{
+    flex:0 0 auto;width:28px;height:28px;border-radius:8px;
+    border:1px solid var(--line);background:#fff;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    font-size:13px;margin-left:auto;
+  }
+  .crew .edit-btn:active{border-color:var(--navy-2)}
   .crew .badge{
     font-family:'JetBrains Mono',monospace;font-weight:700;font-size:12px;
     color:var(--navy);background:#fff;
@@ -238,15 +279,115 @@
   }
   .pp-row a.nav{color:var(--navy);font-weight:700}
   .leaflet-control-attribution{font-size:9px!important}
+
+  /* ── Edit modal ── */
+  #editOverlay{
+    position:fixed;inset:0;background:rgba(22,41,74,.45);
+    display:none;align-items:flex-end;justify-content:center;z-index:2000;
+  }
+  #editOverlay.on{display:flex}
+  #editPanel{
+    width:100%;max-width:480px;max-height:88vh;overflow-y:auto;
+    background:#fff;border-radius:18px 18px 0 0;padding:18px 18px 22px;
+    box-shadow:0 -10px 34px rgba(22,41,74,.28);
+  }
+  #editPanel h2{
+    font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:19px;
+    letter-spacing:.04em;color:var(--navy);margin-bottom:2px;
+    display:flex;align-items:center;gap:8px;
+  }
+  #editPanel h2 .badge{
+    font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--red);
+    border:1px solid var(--red);border-radius:6px;padding:2px 6px;
+  }
+  #editPanel .sub{font-size:12px;color:var(--muted);margin-bottom:16px}
+  .ef-row{margin-bottom:13px}
+  .ef-row label{
+    display:block;font-size:11px;font-weight:700;letter-spacing:.05em;
+    text-transform:uppercase;color:var(--muted);margin-bottom:5px;
+  }
+  .ef-row input[type=text], .ef-row input[type=tel]{
+    width:100%;background:var(--panel-2);border:1px solid var(--line);
+    border-radius:9px;padding:11px 12px;font:500 14.5px 'Inter',sans-serif;
+    color:var(--text);outline:none;
+  }
+  .ef-row input:focus{border-color:var(--navy-2)}
+  .ef-toggle{
+    display:flex;align-items:center;gap:10px;
+    background:var(--panel-2);border:1px solid var(--line);border-radius:9px;
+    padding:11px 12px;cursor:pointer;
+  }
+  .ef-toggle input{width:18px;height:18px;accent-color:var(--red)}
+  .ef-toggle span{font:500 14.5px 'Inter',sans-serif}
+  .ef-hint{font-size:11px;color:var(--muted);margin-top:5px}
+  .ef-btns{display:flex;gap:9px;margin-top:6px}
+  .ef-btns button{
+    flex:1;border:none;border-radius:10px;padding:13px 6px;cursor:pointer;
+    font:700 14px 'Inter',sans-serif;
+  }
+  #efCancel{background:var(--panel-2);color:var(--text)}
+  #efSave{background:var(--red);color:#fff}
+  #efSave:disabled{opacity:.5}
+  #efMsg{font-size:12px;margin-top:10px;text-align:center;min-height:16px}
+  #efMsg.err{color:var(--red)}
+  #efMsg.ok{color:var(--green)}
+  #efNoScript{
+    background:#fdf3dd;border:1px solid #eed9a8;border-radius:10px;
+    padding:12px;font-size:12.5px;color:#7a5a10;line-height:1.5;margin-bottom:14px;
+  }
+
+  /* ── Password gate ── */
+  #lockScreen{
+    position:fixed;inset:0;background:var(--navy);z-index:5000;
+    display:flex;align-items:center;justify-content:center;padding:24px;
+  }
+  #lockScreen.hidden{display:none}
+  #lockBox{width:100%;max-width:340px;text-align:center}
+  #lockBox .lc{
+    font-family:'JetBrains Mono',monospace;font-weight:700;font-size:12px;
+    color:#fff;background:var(--red);border-radius:5px;display:inline-block;
+    padding:3px 9px;letter-spacing:.08em;margin-bottom:14px;
+  }
+  #lockBox h2{
+    font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:22px;
+    letter-spacing:.06em;text-transform:uppercase;color:#fff;margin-bottom:6px;
+  }
+  #lockBox .sub2{font-size:12.5px;color:#9fb4dd;margin-bottom:20px;line-height:1.5}
+  #lockBox input{
+    width:100%;background:var(--navy-2);border:1px solid #3a5688;border-radius:10px;
+    color:#fff;font:600 15px 'Inter',sans-serif;padding:13px 14px;
+    outline:none;text-align:center;letter-spacing:.03em;margin-bottom:12px;
+  }
+  #lockBox input:focus{border-color:var(--red)}
+  #lockBox input::placeholder{color:#7488ab}
+  #lockBox button{
+    width:100%;background:var(--red);color:#fff;border:none;border-radius:10px;
+    padding:13px 6px;font:700 14.5px 'Inter',sans-serif;cursor:pointer;
+  }
+  #lockMsg{font-size:12.5px;color:#ff9d8e;margin-top:12px;min-height:16px}
 </style>
 </head>
 <body>
+
+<div id="lockScreen">
+  <div id="lockBox">
+    <span class="lc">LGG</span>
+    <h2>Crew Map</h2>
+    <div class="sub2">Air Atlanta crew only — enter the shared password to continue.</div>
+    <input type="password" id="lockInput" placeholder="Password" autocomplete="off">
+    <button onclick="tryUnlock()">Unlock</button>
+    <div id="lockMsg"></div>
+  </div>
+</div>
 
 <header>
   <span class="code">LGG</span>
   <h1>Air Atlanta · Crew Map</h1>
   <span class="status"><span class="dot" id="statusDot"></span><span id="statusText">LOADING</span></span>
+  <button id="refreshBtn" onclick="reloadData()" title="Refresh data">↻</button>
 </header>
+
+<div id="toast"></div>
 
 <div id="map"></div>
 
@@ -254,6 +395,7 @@
   <div id="sheetHandle" onclick="toggleSheet()">
     <span class="label">Crew Roster</span>
     <span class="count" id="count">—</span>
+    <button id="routeChip" onclick="toggleRouteBar(event)">🧭 ROUTE</button>
     <div class="grip"></div>
   </div>
   <input id="search" type="text" placeholder="Search code, name or street…" oninput="renderRoster()">
@@ -278,7 +420,66 @@
   <div id="roster"><div id="notice">Loading roster…</div></div>
 </div>
 
+<div id="editOverlay">
+  <div id="editPanel">
+    <h2><span id="efTitleText">Edit crew details</span> <span class="badge" id="efCode">—</span></h2>
+    <div class="sub">Changes save straight to the shared sheet.</div>
+
+    <div id="efNoScript" style="display:none">
+      Live editing isn't switched on for this map yet — ask whoever set it up to add an Apps Script link. For now, edit the sheet directly in Google Sheets.
+    </div>
+
+    <div class="ef-row" id="efCodeRow" style="display:none">
+      <label>3/4 Letter Code</label>
+      <input type="text" id="efCodeInput" placeholder="e.g. GOHE" maxlength="4" style="text-transform:uppercase">
+      <div class="ef-hint">Must be unique — this is how the sheet identifies each person.</div>
+    </div>
+    <div class="ef-row">
+      <label>Name</label>
+      <input type="text" id="efName" placeholder="Full name">
+    </div>
+    <div class="ef-row">
+      <label>Address</label>
+      <input type="text" id="efAddress" placeholder="Street and number">
+    </div>
+    <div class="ef-row">
+      <label>Phone</label>
+      <input type="tel" id="efPhone" placeholder="+31 6 …">
+    </div>
+    <div class="ef-row">
+      <label>Messenger</label>
+      <input type="text" id="efMessenger" placeholder="Facebook username or link">
+    </div>
+    <div class="ef-row">
+      <label>Temp apartment</label>
+      <input type="text" id="efTemp" list="hotelList" placeholder="Hotel name, or leave blank">
+      <datalist id="hotelList"></datalist>
+      <div class="ef-hint">Overrides your address until cleared.</div>
+    </div>
+    <div class="ef-row">
+      <label class="ef-toggle" for="efGarage" style="display:flex">
+        <input type="checkbox" id="efGarage">
+        <span>🚗 Has a garage</span>
+      </label>
+    </div>
+
+    <div class="ef-btns">
+      <button id="efCancel" onclick="closeEdit()">Cancel</button>
+      <button id="efSave" onclick="saveEdit()">Save changes</button>
+    </div>
+    <div id="efMsg"></div>
+  </div>
+</div>
+
+
 <script>
+/* ════════════════════════════════════════════════════════════════
+   Site password — a lightweight gate, not real security. Anyone who
+   views this file's source can read it directly, so this only keeps
+   out casual visitors and search engines, not a determined snoop.
+   Since this data is home addresses, treat it accordingly. */
+const SITE_PASSWORD = "Atlanta2018";
+
 /* ════════════════════════════════════════════════════════════════
    SETUP — the only line you need to touch.
 
@@ -303,8 +504,15 @@
    Sheets → select the column → Data → Data validation → Dropdown →
    add the hotel names below (plus a blank option). The map matches
    them to real addresses automatically.
+
+   3. To let crew edit their own row from the map itself (no Sheets
+      app needed), set up a tiny Google Apps Script that writes back
+      to the sheet, then paste its URL below as APPS_SCRIPT_URL.
+      Full script + deploy steps: see the message where this file
+      was shared. Leave blank to keep editing Sheets-only.
    ════════════════════════════════════════════════════════════════ */
-const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1stNgojmMKU3W74isvlwinKhfBq5FuO90XgAWf6qGHj4/export?format=csv&gid=0";   // ← paste your published-sheet CSV link here
+const SHEET_CSV_URL = "";   // ← paste your published-sheet CSV link here
+const APPS_SCRIPT_URL = ""; // ← paste your Apps Script Web App URL here (optional)
 
 /* Major hotels / crew hotels around Maastricht — the Temp apartment
    column matches against these names (case-insensitive, partial).
@@ -365,8 +573,18 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r
 /* subtle A/B divider drawn along the river */
 let maasLine = null;
 
-let crew = [];             // {Code,Name,Address,Phone,Messenger,Garage,lat,lng,marker,geoFailed,selected,group}
-const geoCache = {};
+let crew = [];             // {Code,Name,Address,Phone,Messenger,Garage,Temp,lat,lng,baseLat,baseLng,marker,geoFailed,selected,group}
+let loadGen = 0;           // increments on refresh; stale geocode loops abort
+
+/* Geocode results persist on this device so only new/changed
+   addresses ever hit the geocoder — repeat visits load instantly. */
+const geoCache = (() => {
+  try{ return JSON.parse(localStorage.getItem('crewGeoCache') || '{}'); }
+  catch(e){ return {}; }
+})();
+function persistGeoCache(){
+  try{ localStorage.setItem('crewGeoCache', JSON.stringify(geoCache)); }catch(e){}
+}
 let routeLayer = null;
 
 /* ── helpers ── */
@@ -427,8 +645,8 @@ async function loadSheet(){
   if(!SHEET_CSV_URL){
     setStatus('DEMO DATA', false);
     crew = DEMO.map(r => ({...r}));
-    $('roster').insertAdjacentHTML('afterbegin',
-      '<div id="notice">Showing demo crew — paste your published Google Sheet link into <code>SHEET_CSV_URL</code> in this file to go live.</div>');
+    $('roster').innerHTML =
+      '<div id="notice">Showing demo crew — paste your published Google Sheet link into <code>SHEET_CSV_URL</code> in this file to go live.</div>';
     await geocodeAll();
     return;
   }
@@ -459,35 +677,79 @@ async function loadSheet(){
   }
 }
 
-/* ── geocoding (Nominatim, polite spacing) ── */
+/* ── geocoding (Nominatim, polite spacing, cached on device) ── */
 async function geocode(addr){
-  if(geoCache[addr]) return geoCache[addr];
+  if(geoCache[addr]) return {pt: geoCache[addr], cached: true};
   const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(addr);
   const res = await fetch(url, {headers:{'Accept':'application/json'}});
   const js = await res.json();
   if(js && js[0]){
     const pt = [parseFloat(js[0].lat), parseFloat(js[0].lon)];
     geoCache[addr] = pt;
-    return pt;
+    persistGeoCache();
+    return {pt, cached: false};
   }
-  return null;
+  return {pt: null, cached: false};
 }
 
 async function geocodeAll(){
+  const gen = ++loadGen;
   renderRoster(); updateCount();
   for(let i=0;i<crew.length;i++){
+    if(gen !== loadGen) return;   // a refresh started — abandon this pass
     const c = crew[i];
     const addr = effAddr(c);
     if(!addr){ c.geoFailed = true; continue; }
+    let hitNetwork = false;
     try{
-      const pt = await geocode(addr);
-      if(pt){ c.lat = pt[0]; c.lng = pt[1]; c.group = sideOfMaas(c.lat, c.lng); addMarker(c); }
+      const {pt, cached} = await geocode(addr);
+      hitNetwork = !cached;
+      if(pt){
+        c.baseLat = pt[0]; c.baseLng = pt[1];
+        c.lat = pt[0]; c.lng = pt[1];
+        c.group = sideOfMaas(c.lat, c.lng);
+        addMarker(c);
+      }
       else c.geoFailed = true;
     }catch(e){ c.geoFailed = true; }
     renderRoster(); updateCount();
-    if(i < crew.length-1) await new Promise(r => setTimeout(r, 1100));
+    /* only pace ourselves when we actually called the geocoder */
+    if(hitNetwork && i < crew.length-1) await new Promise(r => setTimeout(r, 1100));
   }
+  if(gen !== loadGen) return;
+  spreadOverlaps();
   fitAll();
+}
+
+/* Crew in the same building would stack pins exactly on top of each
+   other — fan them out in a small circle (~15 m) so every badge stays
+   visible and tappable. */
+function spreadOverlaps(){
+  const groups = {};
+  crew.forEach(c => {
+    if(c.baseLat === undefined || !c.marker) return;
+    const key = c.baseLat.toFixed(4) + ',' + c.baseLng.toFixed(4);
+    (groups[key] = groups[key] || []).push(c);
+  });
+  for(const key in groups){
+    const g = groups[key];
+    if(g.length < 2){
+      /* solo pin — snap back to true position (covers post-edit moves) */
+      const c = g[0];
+      if(c.lat !== c.baseLat || c.lng !== c.baseLng){
+        c.lat = c.baseLat; c.lng = c.baseLng;
+        c.marker.setLatLng([c.lat, c.lng]);
+      }
+      continue;
+    }
+    const r = 0.00016;
+    g.forEach((c, i) => {
+      const ang = (2 * Math.PI * i) / g.length;
+      c.lat = c.baseLat + r * Math.cos(ang);
+      c.lng = c.baseLng + (r * Math.sin(ang)) / Math.cos(c.baseLat * Math.PI/180);
+      c.marker.setLatLng([c.lat, c.lng]);
+    });
+  }
 }
 
 function markerHtml(c){
@@ -557,6 +819,12 @@ function renderRoster(){
       '<span class="gcount">'+members.length+'</span></div>');
     members.forEach(c => host.appendChild(crewCard(c)));
   });
+  /* rarely used, so it lives at the very end of the list */
+  const addBtn = document.createElement('button');
+  addBtn.id = 'addMxBtn';
+  addBtn.textContent = '＋ Add new mechanic';
+  addBtn.addEventListener('click', addNewMX);
+  host.appendChild(addBtn);
 }
 
 function crewCard(c){
@@ -576,6 +844,7 @@ function crewCard(c){
       + (t?'<span class="temp-badge">🏨 TEMP</span>':'')
       + (hasGarage(c.Garage)?'<span class="garage">🚗 GARAGE</span>':'')+'</div>'
       + '<div class="addr'+(c.geoFailed?' geo-fail':'')+'">'+(c.geoFailed?'⚠ address not found on map — ':'')+addrLine+'</div></span>'
+      + '<button class="edit-btn" title="Edit">✏️</button>'
       + '</div>'
       + '<div class="crew-actions">'
       + '<a class="nav'+(addr?'':' disabled')+'" href="'+(addr?navLink(addr):'#')+'" target="_blank" rel="noopener">📍 Navigate</a>'
@@ -584,6 +853,7 @@ function crewCard(c){
       + '</div>';
     el.querySelector('.pick').addEventListener('click', e => { e.stopPropagation(); toggleSelect(c); });
     el.querySelector('.who').addEventListener('click', () => highlight(c, true));
+    el.querySelector('.edit-btn').addEventListener('click', e => { e.stopPropagation(); openEdit(c); });
     return el;
 }
 
@@ -604,15 +874,29 @@ function toggleSelect(c){
 }
 function selectedCrew(){ return crew.filter(c => c.selected && c.marker); }
 
+let routeOpen = false;
+
 function updateRouteBar(){
   const n = crew.filter(c=>c.selected).length;
-  $('routeBar').classList.toggle('on', n > 0);
+  const chip = $('routeChip');
+  chip.textContent = '🧭 ROUTE (' + n + ')';
+  chip.classList.toggle('on', n > 0);
+  $('sheetPanel').classList.toggle('expanded', n > 0);
+  if(n === 0){ routeOpen = false; clearRouteDrawing(); }
+  $('routeBar').classList.toggle('on', routeOpen && n > 0);
   $('selCount').textContent = n + ' selected';
-  if(n === 0) clearRouteDrawing();
+  setTimeout(()=>map.invalidateSize(), 280);
+}
+
+function toggleRouteBar(e){
+  e.stopPropagation();               // don't collapse the panel
+  routeOpen = !routeOpen;
+  updateRouteBar();
 }
 
 function clearSelection(){
   crew.forEach(c => { if(c.selected){ c.selected = false; refreshMarker(c); } });
+  routeOpen = false;
   clearRouteDrawing();
   renderRoster();
   updateRouteBar();
@@ -707,7 +991,12 @@ function generateRoute(){
   });
   L.marker([dest.lat,dest.lng], {icon:L.divIcon({className:'',html:'<div class="dest-flag">'+esc(dest.code)+'</div>',iconSize:[0,0]}), zIndexOffset:1000}).addTo(routeLayer);
 
-  map.fitBounds(pts, {padding:[50,50]});
+  /* give the map room to show the result */
+  $('sheetPanel').classList.remove('expanded');
+  setTimeout(() => {
+    map.invalidateSize();
+    map.fitBounds(pts, {padding:[50,50]});
+  }, 300);
 
   /* straight-line total, driving will be a bit more */
   let km = 0;
@@ -729,7 +1018,216 @@ function generateRoute(){
 
 function toggleSheet(){ $('sheetPanel').classList.toggle('collapsed'); setTimeout(()=>map.invalidateSize(), 280); }
 
-loadSheet();
+/* ── toast ── */
+let toastTimer = null;
+function showToast(text, isErr){
+  const t = $('toast');
+  t.textContent = text;
+  t.className = 'on' + (isErr ? ' err' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.className = '', isErr ? 6000 : 2500);
+}
+
+/* ── save verification ──
+   The save request is fire-and-forget (Apps Script CORS quirk), so a
+   few seconds later we quietly re-read the real sheet and confirm the
+   row actually changed. If it didn't, the guy gets told instead of
+   silently losing his edit. */
+function verifySave(payload){
+  if(!SHEET_CSV_URL) return;
+  setTimeout(async () => {
+    try{
+      const res = await fetch(SHEET_CSV_URL, {cache:'no-store'});
+      const rows = Papa.parse(await res.text(), {header:true, skipEmptyLines:true}).data;
+      const row = rows.find(r => {
+        const g = {}; for(const k in r) g[k.trim().toLowerCase()] = (r[k]||'').trim();
+        return (g['code']||'').toUpperCase() === payload.code.toUpperCase();
+      });
+      let ok = false;
+      if(row){
+        const g = {}; for(const k in row) g[k.trim().toLowerCase()] = (row[k]||'').trim();
+        ok = g['name'] === payload.name
+          && g['address'] === payload.address
+          && (g['phone'] || g['phone number'] || '') === payload.phone;
+      }
+      if(ok) showToast('Sheet updated ✓');
+      else showToast('⚠ Save not confirmed — check the Google Sheet', true);
+    }catch(e){ /* offline or transient — don't alarm anyone */ }
+  }, 4000);
+}
+
+/* ── manual refresh ── */
+async function reloadData(){
+  loadGen++;                                   // abort any in-flight geocode pass
+  crew.forEach(c => { if(c.marker) map.removeLayer(c.marker); });
+  clearRouteDrawing();
+  $('routeBar').classList.remove('on');
+  crew = [];
+  routeOpen = false;
+  updateRouteBar();
+  $('roster').innerHTML = '<div id="notice">Refreshing…</div>';
+  $('count').textContent = '—';
+  setStatus('LOADING', false);
+  await loadSheet();
+}
+
+/* ── edit modal ── */
+let editing = null;   // the crew object currently being edited (or a stub, if adding)
+let addingNew = false;
+
+function fillHotelDatalist(){
+  const dl = $('hotelList');
+  dl.innerHTML = Object.keys(HOTELS).map(n => '<option value="'+esc(n)+'">').join('');
+}
+fillHotelDatalist();
+
+function openEdit(c, isNew){
+  editing = c;
+  addingNew = !!isNew;
+  $('efTitleText').textContent = addingNew ? 'Add new mechanic' : 'Edit crew details';
+  $('efCode').style.display = addingNew ? 'none' : 'inline-block';
+  $('efCode').textContent = c.Code || '—';
+  $('efCodeRow').style.display = addingNew ? 'block' : 'none';
+  $('efCodeInput').value = c.Code || '';
+  $('efName').value = c.Name || '';
+  $('efAddress').value = c.Address || '';
+  $('efPhone').value = c.Phone || '';
+  $('efMessenger').value = c.Messenger || '';
+  $('efTemp').value = c.Temp || '';
+  $('efGarage').checked = hasGarage(c.Garage);
+  $('efMsg').textContent = '';
+  $('efMsg').className = '';
+  $('efNoScript').style.display = APPS_SCRIPT_URL ? 'none' : 'block';
+  $('efSave').disabled = !APPS_SCRIPT_URL;
+  $('editOverlay').classList.add('on');
+  (addingNew ? $('efCodeInput') : $('efName')).focus();
+}
+function addNewMX(){
+  openEdit({Code:'', Name:'', Address:'', Phone:'', Messenger:'', Garage:'', Temp:''}, true);
+}
+function closeEdit(){
+  $('editOverlay').classList.remove('on');
+  editing = null;
+  addingNew = false;
+}
+
+async function saveEdit(){
+  if(!editing || !APPS_SCRIPT_URL) return;
+  const c = editing;
+
+  let codeVal;
+  if(addingNew){
+    codeVal = $('efCodeInput').value.trim().toUpperCase();
+    if(!codeVal){
+      $('efMsg').textContent = 'Enter a code first.'; $('efMsg').className = 'err';
+      return;
+    }
+    if(crew.some(x => (x.Code||'').toUpperCase() === codeVal)){
+      $('efMsg').textContent = 'That code is already taken — pick another.'; $('efMsg').className = 'err';
+      return;
+    }
+  } else {
+    codeVal = c.Code;
+  }
+
+  const payload = {
+    code: codeVal,
+    name: $('efName').value.trim(),
+    address: $('efAddress').value.trim(),
+    phone: $('efPhone').value.trim(),
+    messenger: $('efMessenger').value.trim(),
+    garage: $('efGarage').checked ? 'yes' : 'no',
+    temp: $('efTemp').value.trim()
+  };
+
+  const msg = $('efMsg');
+  $('efSave').disabled = true;
+  msg.textContent = 'Saving…'; msg.className = '';
+
+  try{
+    /* Apps Script web apps don't return readable CORS headers from a
+       plain fetch, so we fire-and-forget with no-cors and trust it —
+       then reconcile with the real sheet a moment later. */
+    await fetch(APPS_SCRIPT_URL, {
+      method:'POST', mode:'no-cors',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify(payload)
+    });
+
+    let target = c;
+    if(addingNew){
+      target = {Code:codeVal, Name:'', Address:'', Phone:'', Messenger:'', Garage:'', Temp:''};
+      crew.push(target);
+    }
+    const changedAddr = payload.address !== target.Address || payload.temp !== target.Temp;
+    target.Code = codeVal; target.Name = payload.name; target.Address = payload.address;
+    target.Phone = payload.phone; target.Messenger = payload.messenger;
+    target.Garage = payload.garage; target.Temp = payload.temp;
+
+    if(changedAddr || !target.marker){
+      const addr = effAddr(target);
+      if(addr){
+        try{
+          const {pt} = await geocode(addr);
+          if(pt){
+            target.baseLat = pt[0]; target.baseLng = pt[1];
+            target.lat = pt[0]; target.lng = pt[1];
+            target.group = sideOfMaas(target.lat,target.lng); target.geoFailed = false;
+            if(target.marker){ target.marker.setLatLng([target.lat,target.lng]); refreshMarker(target); }
+            else addMarker(target);
+            target.marker.setPopupContent(popupHtml(target));
+            spreadOverlaps();
+          } else target.geoFailed = true;
+        }catch(e){ target.geoFailed = true; }
+      } else target.geoFailed = true;
+    } else if(target.marker){
+      refreshMarker(target);
+      target.marker.setPopupContent(popupHtml(target));
+    }
+
+    verifySave(payload);
+    msg.textContent = 'Saved ✓'; msg.className = 'ok';
+    renderRoster(); updateCount();
+    setTimeout(closeEdit, 700);
+  }catch(e){
+    msg.textContent = "Couldn't reach the sheet — check your connection and try again.";
+    msg.className = 'err';
+  }finally{
+    $('efSave').disabled = false;
+  }
+}
+
+/* ── password gate ──
+   Sits in front of everything sensitive: crew data only starts
+   loading once the password is entered. Unlock is remembered on
+   this device so it's a one-time thing per phone. */
+const UNLOCK_KEY = 'crewMapUnlocked';
+
+function tryUnlock(){
+  const val = $('lockInput').value;
+  if(val === SITE_PASSWORD){
+    try{ localStorage.setItem(UNLOCK_KEY, '1'); }catch(e){}
+    unlockSite();
+  }else{
+    $('lockMsg').textContent = 'Wrong password — try again.';
+    $('lockInput').value = '';
+    $('lockInput').focus();
+  }
+}
+function unlockSite(){
+  $('lockScreen').classList.add('hidden');
+  loadSheet();
+}
+
+$('lockInput').addEventListener('keydown', e => { if(e.key === 'Enter') tryUnlock(); });
+
+let alreadyUnlocked = false;
+try{ alreadyUnlocked = localStorage.getItem(UNLOCK_KEY) === '1'; }catch(e){}
+if(alreadyUnlocked){
+  unlockSite();
+}else{
+  setTimeout(() => $('lockInput').focus(), 300);
+}
 </script>
 </body>
 </html>
