@@ -188,6 +188,18 @@
     flex:1;background:var(--navy-2);color:#fff;border:1px solid #3a5688;
     border-radius:7px;font:600 12.5px 'Inter',sans-serif;padding:7px 8px;outline:none;
   }
+  #startAddr{
+    background:var(--navy-2);color:#fff;border:1px solid #3a5688;
+    border-radius:7px;font:600 12.5px 'Inter',sans-serif;padding:8px 9px;outline:none;
+  }
+  #startAddr::placeholder{color:#7488ab}
+  #startAddr:focus{border-color:var(--red)}
+  .start-flag{
+    font-family:'JetBrains Mono',monospace;font-weight:700;font-size:11px;
+    color:#fff;background:var(--navy);border:2px solid #fff;border-radius:6px;
+    padding:3px 7px;transform:translate(-50%,-50%);display:inline-block;
+    box-shadow:0 1px 6px rgba(0,0,0,.35);white-space:nowrap;
+  }
   #routeBar .rb-btns{display:flex;gap:7px}
   #routeBar button, #routeBar a.gm{
     flex:1;border:none;border-radius:8px;padding:9px 6px;cursor:pointer;
@@ -409,6 +421,14 @@
         <option value="CTR">→ Maastricht centre</option>
       </select>
     </div>
+    <div class="rb-top">
+      <select id="startSel" onchange="onStartModeChange()">
+        <option value="none">Start: auto (best first pickup)</option>
+        <option value="gps">Start: 📍 my location</option>
+        <option value="custom">Start: type an address…</option>
+      </select>
+    </div>
+    <input type="text" id="startAddr" placeholder="Start address (street + number)" style="display:none">
     <div class="rb-btns">
       <button id="genRoute" onclick="generateRoute()">Smartest route</button>
       <a class="gm" id="gmLink" href="#" target="_blank" rel="noopener">Open in Google Maps</a>
@@ -916,15 +936,16 @@ function dist(a, b){
   return 2*R*Math.asin(Math.sqrt(h));
 }
 
-/* Smartest pickup order: visit every selected home once, end at the
-   destination, minimise total distance. Exact (all permutations) up to
-   7 homes; nearest-neighbour + 2-opt beyond that. */
-function bestOrder(stops, dest){
+/* Smartest pickup order: (optionally from a fixed start point,)
+   visit every selected home once, end at the destination, minimise
+   total distance. Exact (all permutations) up to 7 homes;
+   nearest-neighbour + 2-opt beyond that. */
+function bestOrder(stops, dest, start){
   const n = stops.length;
   if(n === 1) return [0];
 
   function pathLen(order){
-    let d = 0;
+    let d = start ? dist(start, stops[order[0]]) : 0;
     for(let i=0;i<order.length-1;i++) d += dist(stops[order[i]], stops[order[i+1]]);
     d += dist(stops[order[order.length-1]], dest);
     return d;
@@ -946,17 +967,9 @@ function bestOrder(stops, dest){
     return best;
   }
 
-  /* NN from best start, then 2-opt */
-  let best = null, bestD = Infinity;
-  for(let s=0;s<n;s++){
-    const left = [...Array(n).keys()].filter(i=>i!==s);
-    const order = [s];
-    while(left.length){
-      const last = stops[order[order.length-1]];
-      let bi = 0, bd = Infinity;
-      left.forEach((i,k) => { const d = dist(last, stops[i]); if(d<bd){bd=d;bi=k;} });
-      order.push(left.splice(bi,1)[0]);
-    }
+  /* NN (+2-opt). With a fixed start, greedy grows from the start
+     point; without one, we try every stop as the first pickup. */
+  function twoOpt(order){
     let improved = true;
     while(improved){
       improved = false;
@@ -966,26 +979,91 @@ function bestOrder(stops, dest){
           if(pathLen(cand) < pathLen(order)){ order.splice(0,order.length,...cand); improved = true; }
         }
     }
+    return order;
+  }
+  function nnFrom(firstIdx){
+    const left = [...Array(n).keys()].filter(i=>i!==firstIdx);
+    const order = [firstIdx];
+    while(left.length){
+      const last = stops[order[order.length-1]];
+      let bi = 0, bd = Infinity;
+      left.forEach((i,k) => { const d = dist(last, stops[i]); if(d<bd){bd=d;bi=k;} });
+      order.push(left.splice(bi,1)[0]);
+    }
+    return twoOpt(order);
+  }
+
+  if(start){
+    let bi = 0, bd = Infinity;
+    stops.forEach((s,i) => { const d = dist(start, s); if(d<bd){bd=d;bi=i;} });
+    return nnFrom(bi);
+  }
+  let best = null, bestD = Infinity;
+  for(let s=0;s<n;s++){
+    const order = nnFrom(s);
     const d = pathLen(order);
     if(d < bestD){ bestD = d; best = order; }
   }
   return best;
 }
 
-function generateRoute(){
+function onStartModeChange(){
+  $('startAddr').style.display = $('startSel').value === 'custom' ? 'block' : 'none';
+}
+
+/* Resolve the chosen start point → {lat,lng,label,gps?,addr?} or null */
+function getStartPoint(){
+  const mode = $('startSel').value;
+  if(mode === 'none') return Promise.resolve(null);
+  if(mode === 'gps'){
+    return new Promise((resolve, reject) => {
+      if(!navigator.geolocation) return reject(new Error("This browser can't share your location"));
+      navigator.geolocation.getCurrentPosition(
+        p => resolve({lat:p.coords.latitude, lng:p.coords.longitude, label:'My location', gps:true}),
+        () => reject(new Error("Couldn't get your location — allow location access and try again")),
+        {enableHighAccuracy:true, timeout:10000}
+      );
+    });
+  }
+  const a = $('startAddr').value.trim();
+  if(!a) return Promise.reject(new Error('Type a start address first'));
+  const addr = fullAddress(a);
+  return geocode(addr).then(({pt}) => {
+    if(!pt) throw new Error("Couldn't find that start address on the map");
+    return {lat:pt[0], lng:pt[1], label:a, addr:addr};
+  });
+}
+
+async function generateRoute(){
   const sel = selectedCrew();
   if(!sel.length){ return; }
   const dest = DESTS[$('destSel').value];
-  const order = bestOrder(sel, dest);
+
+  $('genRoute').disabled = true;
+  let start = null;
+  try{
+    start = await getStartPoint();
+  }catch(e){
+    showToast('⚠ ' + e.message, true);
+    $('genRoute').disabled = false;
+    return;
+  }
+
+  const order = bestOrder(sel, dest, start);
   const ordered = order.map(i => sel[i]);
 
   clearRouteDrawing();
   routeLayer = L.layerGroup().addTo(map);
 
-  const pts = ordered.map(c => [c.lat, c.lng]);
+  const pts = [];
+  if(start) pts.push([start.lat, start.lng]);
+  ordered.forEach(c => pts.push([c.lat, c.lng]));
   pts.push([dest.lat, dest.lng]);
 
   L.polyline(pts, {color:'#cf3339', weight:4, opacity:.85, dashArray:'8 8'}).addTo(routeLayer);
+  if(start){
+    L.marker([start.lat,start.lng], {icon:L.divIcon({className:'',html:'<div class="start-flag">▶ START</div>',iconSize:[0,0]}), zIndexOffset:1000}).addTo(routeLayer);
+  }
   ordered.forEach((c,i) => {
     L.marker([c.lat,c.lng], {icon:L.divIcon({className:'',html:'<div class="route-num">'+(i+1)+'</div>',iconSize:[0,0]}), zIndexOffset:1000}).addTo(routeLayer);
   });
@@ -1002,18 +1080,29 @@ function generateRoute(){
   let km = 0;
   for(let i=0;i<pts.length-1;i++) km += dist({lat:pts[i][0],lng:pts[i][1]},{lat:pts[i+1][0],lng:pts[i+1][1]});
   const info = $('routeInfo');
-  info.textContent = 'PICKUP: ' + ordered.map(c=>c.Code).join(' → ') + ' → ' + dest.code + '  ·  ~' + km.toFixed(1) + ' km direct';
+  info.textContent = (start ? 'START → ' : 'PICKUP: ')
+    + ordered.map(c=>c.Code).join(' → ') + ' → ' + dest.code
+    + '  ·  ~' + km.toFixed(1) + ' km direct';
   info.classList.add('on');
 
-  /* Google Maps directions: origin = first home, waypoints = rest, destination = airport */
-  const origin = encodeURIComponent(effAddr(ordered[0]));
-  const waypts = ordered.slice(1).map(c => encodeURIComponent(effAddr(c))).join('%7C');
-  let gm = 'https://www.google.com/maps/dir/?api=1&origin=' + origin
+  /* Google Maps directions link.
+     - fixed start: origin = that point, all homes become waypoints
+     - my location: omit origin → Google Maps uses live position
+     - no start:   origin = first home, rest are waypoints */
+  let origin = null, homes = ordered;
+  if(start && start.gps){ origin = null; }
+  else if(start){ origin = encodeURIComponent(start.addr); }
+  else { origin = encodeURIComponent(effAddr(ordered[0])); homes = ordered.slice(1); }
+
+  const waypts = homes.map(c => encodeURIComponent(effAddr(c))).join('%7C');
+  let gm = 'https://www.google.com/maps/dir/?api=1'
+         + (origin ? '&origin=' + origin : '')
          + '&destination=' + encodeURIComponent(dest.q) + '&travelmode=driving';
   if(waypts) gm += '&waypoints=' + waypts;
   const a = $('gmLink');
   a.href = gm;
   a.classList.add('on');
+  $('genRoute').disabled = false;
 }
 
 function toggleSheet(){ $('sheetPanel').classList.toggle('collapsed'); setTimeout(()=>map.invalidateSize(), 280); }
